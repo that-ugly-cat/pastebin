@@ -3,6 +3,10 @@
   No usernames, no email, no recovery — the password *is* the account.
 </p>
 
+<p align="center">
+  <a href="LICENSE"><img alt="License: AGPL v3" src="https://img.shields.io/badge/License-AGPLv3-blue.svg"></a>
+</p>
+
 ---
 
 Pastebin is a self-hosted scratchpad for text snippets. Create an account by picking a
@@ -59,3 +63,9 @@ proxy).
 - `ADMIN_PASSWORD` is optional: set it to seed/update the admin account on every startup. Leave
   it unset to run without an admin panel.
 - The whole database is a single SQLite file — back up by copying it.
+
+## License
+
+Copyright (C) 2026 Giovanni Spitale. Licensed under AGPL-3.0 — fork it, host it, sell access
+to it, but keep it closed-source and you're in violation. No SaaS forks that don't share
+back. See [LICENSE](LICENSE).
