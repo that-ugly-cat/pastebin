@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pastebin</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f1117; color: #e2e8f0;
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      padding: 2rem;
+    }
+
+    .card {
+      background: #1a1d27; border: 1px solid #2d3148; border-radius: 10px;
+      padding: 2rem 2.25rem; width: 100%; max-width: 380px;
+    }
+
+    .brand { font-size: 1.5rem; font-weight: 900; letter-spacing: -0.02em; margin-bottom: 0.3rem; }
+    .brand span { color: #63b3ed; }
+    .tagline { font-size: 0.8rem; color: #718096; margin-bottom: 2rem; }
+
+    .section-label {
+      font-size: 0.72rem; font-weight: 700; color: #a0aec0;
+      text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.8rem;
+    }
+
+    label { display: block; font-size: 0.75rem; color: #718096; margin-bottom: 0.25rem; margin-top: 0.75rem; }
+    label:first-of-type { margin-top: 0; }
+
+    input[type="password"] {
+      width: 100%; padding: 0.6rem 0.8rem;
+      background: #0f1117; border: 1px solid #2d3148; border-radius: 6px;
+      color: #e2e8f0; font-size: 0.9rem; outline: none;
+    }
+    input[type="password"]:focus { border-color: #4a6fa5; }
+
+    .btn {
+      width: 100%; margin-top: 1rem; padding: 0.65rem;
+      border: none; border-radius: 6px; font-size: 0.88rem; font-weight: 600; cursor: pointer;
+    }
+    .btn-primary { background: #0a3c8a; color: #fff; }
+    .btn-primary:hover { background: #0d4fa8; }
+    .btn-secondary { background: #1a1d27; color: #e2e8f0; border: 1px solid #2d3148; }
+    .btn-secondary:hover { border-color: #4a6fa5; }
+
+    .divider {
+      display: flex; align-items: center; gap: 0.75rem; margin: 1.75rem 0;
+    }
+    .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: #2d3148; }
+    .divider span { font-size: 0.72rem; color: #4a5568; }
+
+    .error {
+      margin-top: 0.75rem; padding: 0.5rem 0.75rem;
+      background: #2d1515; border: 1px solid #7b2020; border-radius: 6px;
+      font-size: 0.8rem; color: #fc8181;
+    }
+
+    .help-btn {
+      position: absolute; top: 0.6rem; right: 0.7rem;
+      width: 20px; height: 20px; border-radius: 50%;
+      background: #1e2235; border: 1px solid #2d3148;
+      color: #718096; font-size: 0.72rem; font-weight: 700;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      line-height: 1;
+    }
+    .help-btn:hover { border-color: #4a6fa5; color: #e2e8f0; }
+
+    .overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.6); z-index: 100;
+      align-items: center; justify-content: center; padding: 1.5rem;
+    }
+    .overlay.open { display: flex; }
+    .help-modal {
+      background: #1a1d27; border: 1px solid #2d3148; border-radius: 10px;
+      width: 100%; max-width: 360px; padding: 1.5rem;
+    }
+    .help-modal h2 { font-size: 0.95rem; font-weight: 700; margin-bottom: 1rem; color: #e2e8f0; }
+    .help-modal p { font-size: 0.82rem; color: #a0aec0; line-height: 1.65; margin-bottom: 0.75rem; }
+    .help-modal p:last-of-type { margin-bottom: 1.25rem; }
+    .help-modal strong { color: #e2e8f0; }
+    .btn-close {
+      width: 100%; padding: 0.5rem; background: #1e2235; border: 1px solid #2d3148;
+      border-radius: 6px; color: #a0aec0; font-size: 0.82rem; cursor: pointer;
+    }
+    .btn-close:hover { border-color: #4a6fa5; color: #e2e8f0; }
+  </style>
+</head>
+<body>
+<div class="card" style="position:relative">
+  <button class="help-btn" onclick="document.getElementById('overlay').classList.add('open')">?</button>
+  <div class="brand">Paste<span>bin</span></div>
+  <p class="tagline">Password-protected text storage.</p>
+
+  <div class="section-label">Create new pastebin</div>
+  <form method="post" action="/create">
+    <label for="c-pw">Password</label>
+    <input type="password" id="c-pw" name="password" placeholder="Min. 6 characters" required autofocus>
+    <label for="c-pw2">Confirm password</label>
+    <input type="password" id="c-pw2" name="password2" placeholder="Repeat password" required>
+    <button type="submit" class="btn btn-primary">Create</button>
+    {% if error_create %}<div class="error">{{ error_create }}</div>{% endif %}
+  </form>
+
+  <div class="divider"><span>or</span></div>
+
+  <div class="section-label">Open existing</div>
+  <form method="post" action="/login">
+    <label for="l-pw">Password</label>
+    <input type="password" id="l-pw" name="password" placeholder="Your pastebin password" required>
+    <button type="submit" class="btn btn-secondary">Open</button>
+    {% if error_login %}<div class="error">{{ error_login }}</div>{% endif %}
+  </form>
+</div>
+<div class="overlay" id="overlay" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="help-modal">
+    <h2>How it works</h2>
+    <p><strong>Your password is your account.</strong> There are no usernames — the password you choose is the only key to your pastebin.</p>
+    <p>Choose a password to <strong>create</strong> a new pastebin. Use the same password later to <strong>open</strong> it again from any device.</p>
+    <p>Inside, you can store any number of titled text items — notes, snippets, links, anything. Items can be created, edited, and deleted.</p>
+    <p><strong>Don't lose your password.</strong> There is no recovery mechanism.</p>
+    <button class="btn-close" onclick="document.getElementById('overlay').classList.remove('open')">Got it</button>
+  </div>
+</div>
+<script>
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.getElementById('overlay').classList.remove('open');
+});
+</script>
+</body>
+</html>

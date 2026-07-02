@@ -1,0 +1,11 @@
+services:
+  web:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8511:8000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - SECRET_KEY=${SECRET_KEY:-pastebin-dev-secret-change-me}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Account #{{ account_id }} — Pastebin Admin</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; }
+
+    nav { background: #1a1d27; border-bottom: 1px solid #2d3148; padding: 0 1.5rem; position: sticky; top: 0; z-index: 100; }
+    .nav-inner { max-width: 960px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; height: 52px; }
+    .brand { font-size: 1rem; font-weight: 900; color: #e2e8f0; }
+    .brand span { color: #63b3ed; }
+    .badge { font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; background: #2d3148; color: #a0aec0; padding: 0.15rem 0.45rem; border-radius: 3px; margin-left: 0.5rem; vertical-align: middle; }
+    .nav-back { font-size: 0.8rem; color: #718096; text-decoration: none; }
+    .nav-back:hover { color: #e2e8f0; }
+
+    .container { max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem; }
+    h1 { font-size: 1.2rem; font-weight: 800; margin-bottom: 0.25rem; }
+    .sub { font-size: 0.82rem; color: #718096; margin-bottom: 2rem; }
+
+    .empty { color: #718096; font-size: 0.88rem; padding: 3rem 0; text-align: center; }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+    .card {
+      background: #1a1d27; border: 1px solid #2d3148; border-radius: 8px;
+      padding: 1.25rem; cursor: pointer;
+      transition: border-color 0.15s, transform 0.1s;
+      display: flex; flex-direction: column; gap: 0.5rem;
+    }
+    .card:hover { border-color: #4a6fa5; transform: translateY(-2px); }
+    .card-title { font-size: 0.95rem; font-weight: 700; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .card-preview { font-size: 0.8rem; color: #718096; line-height: 1.55; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; flex: 1; }
+    .card-date { font-size: 0.68rem; color: #4a5568; margin-top: 0.25rem; }
+
+    .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 200; align-items: center; justify-content: center; padding: 1.5rem; }
+    .overlay.open { display: flex; }
+    .modal { background: #1a1d27; border: 1px solid #2d3148; border-radius: 10px; width: 100%; max-width: 660px; max-height: 85vh; display: flex; flex-direction: column; }
+    .modal-header { display: flex; align-items: center; gap: 0.75rem; padding: 1rem 1.25rem; border-bottom: 1px solid #2d3148; flex-shrink: 0; }
+    .modal-title { font-size: 1rem; font-weight: 700; color: #e2e8f0; flex: 1; }
+    .btn-close { background: none; border: none; color: #718096; font-size: 1.2rem; cursor: pointer; line-height: 1; flex-shrink: 0; padding: 0.2rem; }
+    .btn-close:hover { color: #e2e8f0; }
+    .modal-body { flex: 1; overflow-y: auto; padding: 1.25rem; }
+    .modal-text { font-size: 0.88rem; color: #e2e8f0; line-height: 1.75; white-space: pre-wrap; word-break: break-word; }
+    .modal-text-empty { font-size: 0.88rem; color: #4a5568; font-style: italic; }
+    .modal-footer { padding: 0.9rem 1.25rem; border-top: 1px solid #2d3148; flex-shrink: 0; font-size: 0.75rem; color: #4a5568; }
+
+    @media (max-width: 560px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <div class="brand">Paste<span>bin</span><span class="badge">admin</span></div>
+    <a class="nav-back" href="/admin">← Back to admin</a>
+  </div>
+</nav>
+
+<div class="container">
+  <h1>Account #{{ account_id }}</h1>
+  <p class="sub">Read-only view.</p>
+
+  {% if items %}
+  <div class="grid">
+    {% for item in items %}
+    <div class="card" onclick="openItem({{ loop.index0 }})">
+      <div class="card-title">{{ item.title }}</div>
+      <div class="card-preview">{% if item.preview %}{{ item.preview }}{% else %}<em style="color:#4a5568">No text</em>{% endif %}</div>
+      <div class="card-date">{{ item.updated_at }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty">This account has no items.</div>
+  {% endif %}
+</div>
+
+<div class="overlay" id="overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-title"></div>
+      <button class="btn-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="modal-text"></div>
+    </div>
+    <div class="modal-footer">Updated <span id="modal-date"></span></div>
+  </div>
+</div>
+
+<script>
+const ITEMS = {{ items | tojson }};
+
+function openItem(idx) {
+  const item = ITEMS[idx];
+  document.getElementById("modal-title").textContent = item.title;
+  document.getElementById("modal-date").textContent = item.updated_at;
+  const el = document.getElementById("modal-text");
+  if (item.text) {
+    el.className = "modal-text";
+    el.textContent = item.text;
+  } else {
+    el.className = "modal-text-empty";
+    el.textContent = "No text.";
+  }
+  document.getElementById("overlay").classList.add("open");
+}
+
+function closeModal() {
+  document.getElementById("overlay").classList.remove("open");
+}
+
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+</script>
+
+</body>
+</html>

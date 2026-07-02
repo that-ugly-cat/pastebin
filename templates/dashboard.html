@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pastebin</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; }
+
+    nav {
+      background: #1a1d27; border-bottom: 1px solid #2d3148;
+      padding: 0 1.5rem; position: sticky; top: 0; z-index: 100;
+    }
+    .nav-inner {
+      max-width: 960px; margin: 0 auto;
+      display: flex; align-items: center; justify-content: space-between; height: 52px;
+    }
+    .brand { font-size: 1rem; font-weight: 900; color: #e2e8f0; }
+    .brand span { color: #63b3ed; }
+    .nav-right { display: flex; gap: 1rem; align-items: center; }
+    .nav-right a { font-size: 0.8rem; color: #718096; text-decoration: none; }
+    .nav-right a:hover { color: #e2e8f0; }
+
+    .btn-new {
+      padding: 0.4rem 1rem; background: #0a3c8a; color: #fff;
+      border: none; border-radius: 6px; font-size: 0.82rem; font-weight: 600; cursor: pointer;
+    }
+    .btn-new:hover { background: #0d4fa8; }
+
+    .container { max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+    .empty { text-align: center; padding: 5rem 2rem; color: #718096; }
+    .empty p { font-size: 0.9rem; margin-bottom: 1.25rem; }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+
+    .card {
+      background: #1a1d27; border: 1px solid #2d3148; border-radius: 8px;
+      padding: 1.25rem; cursor: pointer;
+      transition: border-color 0.15s, transform 0.1s;
+      display: flex; flex-direction: column; gap: 0.5rem;
+    }
+    .card:hover { border-color: #4a6fa5; transform: translateY(-2px); }
+    .card-title {
+      font-size: 0.95rem; font-weight: 700; color: #e2e8f0;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .card-preview {
+      font-size: 0.8rem; color: #718096; line-height: 1.55;
+      overflow: hidden; display: -webkit-box;
+      -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+      flex: 1;
+    }
+    .card-date { font-size: 0.68rem; color: #4a5568; margin-top: 0.25rem; }
+
+    /* Modal */
+    .overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.65); z-index: 200;
+      align-items: center; justify-content: center; padding: 1.5rem;
+    }
+    .overlay.open { display: flex; }
+
+    .modal {
+      background: #1a1d27; border: 1px solid #2d3148; border-radius: 10px;
+      width: 100%; max-width: 660px; max-height: 85vh;
+      display: flex; flex-direction: column;
+    }
+    .modal-header {
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 1rem 1.25rem; border-bottom: 1px solid #2d3148; flex-shrink: 0;
+    }
+    .modal-title-view { font-size: 1rem; font-weight: 700; color: #e2e8f0; flex: 1; }
+    .modal-title-input {
+      flex: 1; background: #0f1117; border: 1px solid #2d3148; border-radius: 6px;
+      padding: 0.4rem 0.7rem; font-size: 1rem; font-weight: 700; color: #e2e8f0; outline: none;
+    }
+    .modal-title-input:focus { border-color: #4a6fa5; }
+    .btn-close {
+      background: none; border: none; color: #718096;
+      font-size: 1.2rem; cursor: pointer; line-height: 1; flex-shrink: 0; padding: 0.2rem;
+    }
+    .btn-close:hover { color: #e2e8f0; }
+
+    .modal-body { flex: 1; overflow-y: auto; padding: 1.25rem; }
+    .modal-text-view {
+      font-size: 0.88rem; color: #e2e8f0; line-height: 1.75;
+      white-space: pre-wrap; word-break: break-word;
+    }
+    .modal-text-empty { font-size: 0.88rem; color: #4a5568; font-style: italic; }
+    .modal-text-input {
+      width: 100%; min-height: 300px;
+      background: #0f1117; border: 1px solid #2d3148; border-radius: 6px;
+      padding: 0.75rem; font-size: 0.88rem; color: #e2e8f0;
+      outline: none; resize: vertical; font-family: inherit; line-height: 1.75;
+    }
+    .modal-text-input:focus { border-color: #4a6fa5; }
+
+    .modal-footer {
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.9rem 1.25rem; border-top: 1px solid #2d3148; flex-shrink: 0;
+    }
+    .spacer { flex: 1; }
+
+    .btn { padding: 0.42rem 0.85rem; border-radius: 6px; font-size: 0.82rem; font-weight: 600; cursor: pointer; border: none; }
+    .btn-primary { background: #0a3c8a; color: #fff; }
+    .btn-primary:hover { background: #0d4fa8; }
+    .btn-edit { background: #1a1d27; color: #e2e8f0; border: 1px solid #2d3148; }
+    .btn-edit:hover { border-color: #4a6fa5; }
+    .btn-danger { background: #2d1515; color: #fc8181; border: 1px solid #7b2020; }
+    .btn-danger:hover { background: #7b2020; color: #fff; border-color: #7b2020; }
+    .btn-ghost { background: none; color: #718096; border: 1px solid #2d3148; }
+    .btn-ghost:hover { border-color: #4a6fa5; color: #e2e8f0; }
+
+    .confirm-row { display: none; align-items: center; gap: 0.5rem; }
+    .confirm-row.show { display: flex; }
+    .confirm-label { font-size: 0.78rem; color: #fc8181; }
+
+    @media (max-width: 560px) {
+      .grid { grid-template-columns: 1fr; }
+      .modal { max-height: 92vh; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <div class="brand">Paste<span>bin</span></div>
+    <div class="nav-right">
+      <button class="btn-new" onclick="openNew()">+ New</button>
+      <a href="/logout">Sign out</a>
+    </div>
+  </div>
+</nav>
+
+<div class="container">
+  {% if items %}
+  <div class="grid">
+    {% for item in items %}
+    <div class="card" onclick="openItem({{ loop.index0 }})">
+      <div class="card-title">{{ item.title }}</div>
+      <div class="card-preview">{% if item.preview %}{{ item.preview }}{% else %}<em style="color:#4a5568">No text</em>{% endif %}</div>
+      <div class="card-date">{{ item.updated_at }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty">
+    <p>No items yet.</p>
+    <button class="btn-new" onclick="openNew()">+ Create first item</button>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Modal -->
+<div class="overlay" id="overlay" onclick="handleOverlayClick(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div id="title-view" class="modal-title-view"></div>
+      <input id="title-input" class="modal-title-input" type="text" placeholder="Title" style="display:none" maxlength="200">
+      <button class="btn-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="text-view"></div>
+      <textarea id="text-input" class="modal-text-input" placeholder="Text…" style="display:none"></textarea>
+    </div>
+    <div class="modal-footer">
+      <div class="confirm-row" id="confirm-row">
+        <span class="confirm-label">Delete this item?</span>
+        <button class="btn btn-danger" onclick="confirmDelete()">Delete</button>
+        <button class="btn btn-ghost" onclick="cancelDelete()">Cancel</button>
+      </div>
+      <div class="spacer"></div>
+      <div id="view-actions">
+        <button class="btn btn-edit" onclick="enterEdit()">Edit</button>
+        <button class="btn btn-danger" style="margin-left:0.4rem" onclick="startDelete()">Delete</button>
+      </div>
+      <div id="edit-actions" style="display:none; gap:0.4rem; display:none">
+        <button class="btn btn-ghost" onclick="cancelEdit()">Cancel</button>
+        <button class="btn btn-primary" onclick="save()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const ITEMS = {{ items | tojson }};
+let currentIdx = null;
+
+function openItem(idx) {
+  currentIdx = idx;
+  const item = ITEMS[idx];
+  document.getElementById("title-view").textContent = item.title;
+  const tv = document.getElementById("text-view");
+  if (item.text) {
+    tv.className = "modal-text-view";
+    tv.textContent = item.text;
+  } else {
+    tv.className = "modal-text-empty";
+    tv.textContent = "No text.";
+  }
+  showView();
+  document.getElementById("overlay").classList.add("open");
+}
+
+function openNew() {
+  currentIdx = null;
+  document.getElementById("title-input").value = "";
+  document.getElementById("text-input").value = "";
+  showEdit();
+  document.getElementById("overlay").classList.add("open");
+  setTimeout(() => document.getElementById("title-input").focus(), 50);
+}
+
+function closeModal() {
+  document.getElementById("overlay").classList.remove("open");
+}
+
+function handleOverlayClick(e) {
+  if (e.target === document.getElementById("overlay")) closeModal();
+}
+
+function showView() {
+  document.getElementById("title-view").style.display = "";
+  document.getElementById("title-input").style.display = "none";
+  document.getElementById("text-view").style.display = "";
+  document.getElementById("text-input").style.display = "none";
+  document.getElementById("view-actions").style.display = "";
+  document.getElementById("edit-actions").style.display = "none";
+  document.getElementById("confirm-row").classList.remove("show");
+}
+
+function showEdit() {
+  document.getElementById("title-view").style.display = "none";
+  document.getElementById("title-input").style.display = "";
+  document.getElementById("text-view").style.display = "none";
+  document.getElementById("text-input").style.display = "";
+  document.getElementById("view-actions").style.display = "none";
+  document.getElementById("edit-actions").style.display = "flex";
+  document.getElementById("confirm-row").classList.remove("show");
+}
+
+function enterEdit() {
+  const item = ITEMS[currentIdx];
+  document.getElementById("title-input").value = item.title;
+  document.getElementById("text-input").value = item.text;
+  showEdit();
+  document.getElementById("title-input").focus();
+}
+
+function cancelEdit() {
+  if (currentIdx === null) { closeModal(); return; }
+  showView();
+}
+
+function startDelete() {
+  document.getElementById("confirm-row").classList.add("show");
+  document.getElementById("view-actions").style.display = "none";
+}
+
+function cancelDelete() {
+  document.getElementById("confirm-row").classList.remove("show");
+  document.getElementById("view-actions").style.display = "";
+}
+
+async function save() {
+  const title = document.getElementById("title-input").value.trim();
+  const text  = document.getElementById("text-input").value;
+  if (!title) { document.getElementById("title-input").focus(); return; }
+
+  const url    = currentIdx !== null ? `/api/items/${ITEMS[currentIdx].id}` : "/api/items";
+  const method = currentIdx !== null ? "PUT" : "POST";
+
+  const resp = await fetch(url, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title, text }),
+  });
+  if (resp.ok) location.reload();
+}
+
+async function confirmDelete() {
+  if (currentIdx === null) return;
+  const resp = await fetch(`/api/items/${ITEMS[currentIdx].id}`, { method: "DELETE" });
+  if (resp.ok) location.reload();
+}
+
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") closeModal();
+  if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+    const editVisible = document.getElementById("edit-actions").style.display !== "none";
+    if (editVisible) { e.preventDefault(); save(); }
+  }
+});
+</script>
+
+</body>
+</html>

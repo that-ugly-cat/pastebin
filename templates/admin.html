@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — Pastebin</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; }
+
+    nav { background: #1a1d27; border-bottom: 1px solid #2d3148; padding: 0 1.5rem; position: sticky; top: 0; z-index: 100; }
+    .nav-inner { max-width: 960px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; height: 52px; }
+    .brand { font-size: 1rem; font-weight: 900; color: #e2e8f0; }
+    .brand span { color: #63b3ed; }
+    .badge { font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; background: #2d3148; color: #a0aec0; padding: 0.15rem 0.45rem; border-radius: 3px; margin-left: 0.5rem; vertical-align: middle; }
+    .nav-right a { font-size: 0.8rem; color: #718096; text-decoration: none; }
+    .nav-right a:hover { color: #e2e8f0; }
+
+    .container { max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem; }
+    h1 { font-size: 1.3rem; font-weight: 800; margin-bottom: 0.25rem; }
+    .sub { font-size: 0.82rem; color: #718096; margin-bottom: 2rem; }
+
+    .alert { padding: 0.6rem 0.9rem; border-radius: 6px; font-size: 0.82rem; margin-bottom: 1.5rem; }
+    .alert-success { background: #1a3d25; border: 1px solid #276749; color: #68d391; }
+    .alert-error   { background: #2d1515; border: 1px solid #7b2020; color: #fc8181; }
+
+    .empty { color: #718096; font-size: 0.88rem; padding: 3rem 0; text-align: center; }
+
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      text-align: left; font-size: 0.68rem; text-transform: uppercase;
+      letter-spacing: 0.08em; color: #718096;
+      padding: 0.6rem 1rem; border-bottom: 1px solid #2d3148;
+    }
+    tbody td { padding: 0.75rem 1rem; border-bottom: 1px solid #1e2235; font-size: 0.85rem; color: #a0aec0; vertical-align: middle; }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover td { background: rgba(255,255,255,0.02); }
+
+    td.id-col { color: #4a5568; font-size: 0.78rem; width: 52px; }
+    td.count-col { width: 64px; text-align: center; color: #e2e8f0; font-weight: 600; }
+
+    .reset-form { display: flex; gap: 0.4rem; align-items: center; }
+    .reset-form input[type="password"] {
+      padding: 0.35rem 0.6rem; background: #0f1117; border: 1px solid #2d3148;
+      border-radius: 5px; color: #e2e8f0; font-size: 0.8rem; outline: none; width: 160px;
+    }
+    .reset-form input[type="password"]:focus { border-color: #4a6fa5; }
+    .btn-set {
+      padding: 0.35rem 0.75rem; background: #1a1d27; border: 1px solid #2d3148;
+      border-radius: 5px; color: #a0aec0; font-size: 0.78rem; font-weight: 600; cursor: pointer;
+    }
+    .btn-set:hover { border-color: #4a6fa5; color: #e2e8f0; }
+
+    .link-view { font-size: 0.8rem; color: #4a6fa5; text-decoration: none; white-space: nowrap; }
+    .link-view:hover { color: #63b3ed; }
+
+    .reset-ok { font-size: 0.75rem; color: #68d391; margin-left: 0.4rem; }
+
+    .pw-cell { display: flex; align-items: center; gap: 0.4rem; }
+    .pw-text { font-family: monospace; font-size: 0.82rem; color: #e2e8f0; filter: blur(4px); transition: filter 0.15s; cursor: pointer; user-select: none; }
+    .pw-text.visible { filter: none; cursor: default; }
+    .pw-toggle { background: none; border: none; color: #4a5568; font-size: 0.72rem; cursor: pointer; padding: 0; line-height: 1; flex-shrink: 0; }
+    .pw-toggle:hover { color: #a0aec0; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <div class="brand">Paste<span>bin</span><span class="badge">admin</span></div>
+    <div class="nav-right"><a href="/logout">Sign out</a></div>
+  </div>
+</nav>
+
+<div class="container">
+  <h1>Admin Panel</h1>
+  <p class="sub">Manage accounts and reset passwords.</p>
+
+  {% if error %}
+  <div class="alert alert-error">{{ error }}</div>
+  {% endif %}
+  {% if reset_id %}
+  <div class="alert alert-success">Password reset for account #{{ reset_id }}.</div>
+  {% endif %}
+
+  {% if rows %}
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Created</th>
+        <th>Last activity</th>
+        <th style="text-align:center">Items</th>
+        <th>Password</th>
+        <th>Reset password</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td class="id-col">{{ row.id }}</td>
+        <td>{{ row.created_at }}</td>
+        <td>{{ row.last_activity }}</td>
+        <td class="count-col">{{ row.item_count }}</td>
+        <td>
+          <div class="pw-cell">
+            <span class="pw-text" id="pw-{{ row.id }}" onclick="togglePw({{ row.id }})">{{ row.password_plain }}</span>
+            <button class="pw-toggle" onclick="togglePw({{ row.id }})" title="Show/hide">👁</button>
+          </div>
+        </td>
+        <td>
+          <form class="reset-form" method="post" action="/admin/accounts/{{ row.id }}/reset">
+            <input type="password" name="new_password" placeholder="New password" minlength="6" required>
+            <button type="submit" class="btn-set">Set</button>
+            {% if reset_id == row.id %}<span class="reset-ok">✓</span>{% endif %}
+          </form>
+        </td>
+        <td>
+          <a class="link-view" href="/admin/accounts/{{ row.id }}">View items →</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty">No user accounts yet.</div>
+  {% endif %}
+</div>
+
+<script>
+function togglePw(id) {
+  const el = document.getElementById("pw-" + id);
+  el.classList.toggle("visible");
+}
+</script>
+</body>
+</html>
