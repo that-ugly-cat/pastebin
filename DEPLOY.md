@@ -47,7 +47,7 @@ docker compose up -d --build
 Put it behind a proxy that terminates TLS. Example **Caddy**:
 
 ```
-pastebin.example.org {
+yourdomain.example {
     reverse_proxy localhost:8511
 }
 ```
