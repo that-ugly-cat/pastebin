@@ -9,3 +9,6 @@ services:
     environment:
       - SECRET_KEY=${SECRET_KEY:-pastebin-dev-secret-change-me}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      # Keys the password lookup index. See DEPLOY.md: it must not change
+      # once accounts exist. Unset falls back to SECRET_KEY.
+      - PASTEBIN_PEPPER=${PASTEBIN_PEPPER:-}

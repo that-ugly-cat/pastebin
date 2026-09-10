@@ -1,4 +1,7 @@
+import asyncio
 import os
+import time
+from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
@@ -8,8 +11,9 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
-from auth import create_token, get_current_account, require_admin, sha_password
-from models import Account, Item, get_db, init_db, seed_admin
+from auth import (create_token, get_current_account, lookup_index, make_verifier,
+                  require_admin, sha_password, verify_password)
+from models import Account, Item, get_db, init_db, opaque_legacy_index, seed_admin
 
 app = FastAPI(title="Pastebin")
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
@@ -29,6 +33,47 @@ async def redirect_exception_handler(request: Request, exc: HTTPException):
     return await _default_http_exc(request, exc)
 
 
+# ── Guess throttling ──────────────────────────────────────────────────────────
+#
+# Guessing is a working way in here, not merely a way to take over one account:
+# the password *is* the identity, so there is no username to be wrong about and
+# every guess is a guess against every account at once. The shape is the one the
+# ArguMap class codes use — a delay first, a refusal only past a much higher
+# count — because a lecture hall is one NATed address and a hard block after a
+# few dozen collective typos would lock out the people who typed correctly.
+
+_FAILURES: dict[str, list[float]] = defaultdict(list)
+_SOFT_LIMIT, _HARD_LIMIT, _WINDOW = 8, 40, 60.0
+
+
+def _client_key(request: Request) -> str:
+    fwd = request.headers.get("x-forwarded-for", "")
+    if fwd:
+        return fwd.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+def _recent_failures(key: str) -> int:
+    now = time.monotonic()
+    hits = [t for t in _FAILURES[key] if now - t < _WINDOW]
+    _FAILURES[key] = hits
+    return len(hits)
+
+
+async def _throttle(request: Request) -> bool:
+    """True when the caller should be refused outright."""
+    n = _recent_failures(_client_key(request))
+    if n >= _HARD_LIMIT:
+        return True
+    if n >= _SOFT_LIMIT:
+        await asyncio.sleep(1.0)
+    return False
+
+
+def _record_failure(request: Request) -> None:
+    _FAILURES[_client_key(request)].append(time.monotonic())
+
+
 # ── Landing ───────────────────────────────────────────────────────────────────
 
 @app.get("/", response_class=HTMLResponse)
@@ -46,17 +91,29 @@ async def create_account(
     db: Session = Depends(get_db),
 ):
     ctx = {"error_login": "", "error_create": ""}
+    if await _throttle(request):
+        ctx["error_create"] = "Too many attempts. Wait a minute and try again."
+        return templates.TemplateResponse(request, "login.html", ctx, status_code=429)
     if password != password2:
         ctx["error_create"] = "Passwords do not match."
         return templates.TemplateResponse(request, "login.html", ctx, status_code=400)
     if len(password) < 6:
         ctx["error_create"] = "Password must be at least 6 characters."
         return templates.TemplateResponse(request, "login.html", ctx, status_code=400)
-    sha = sha_password(password)
-    if db.query(Account).filter(Account.password_sha == sha).first():
+    # Both indices, because an account that has not logged in since the upgrade
+    # is still findable only by the legacy one — and two accounts sharing a
+    # password would be indistinguishable at login.
+    taken = db.query(Account).filter(
+        (Account.pw_lookup == lookup_index(password)) |
+        (Account.password_sha == sha_password(password))
+    ).first()
+    if taken:
+        _record_failure(request)
         ctx["error_create"] = "Password already taken. Choose another, or log in below."
         return templates.TemplateResponse(request, "login.html", ctx, status_code=400)
-    account = Account(password_sha=sha, password_plain=password)
+    account = Account(password_sha=opaque_legacy_index(),
+                      pw_lookup=lookup_index(password),
+                      pw_verify=make_verifier(password))
     db.add(account)
     db.commit()
     db.refresh(account)
@@ -71,9 +128,27 @@ async def login(
     password: str = Form(...),
     db: Session = Depends(get_db),
 ):
-    sha = sha_password(password)
-    account = db.query(Account).filter(Account.password_sha == sha).first()
+    if await _throttle(request):
+        ctx = {"error_login": "Too many attempts. Wait a minute and try again.", "error_create": ""}
+        return templates.TemplateResponse(request, "login.html", ctx, status_code=429)
+
+    account = db.query(Account).filter(Account.pw_lookup == lookup_index(password)).first()
+    if account and not verify_password(password, account.pw_verify):
+        account = None  # index hit without the verifier agreeing: not this password
     if not account:
+        # Not upgraded yet: found by the legacy index, and upgraded here, once,
+        # from the password the person just typed. Nobody is asked to reset
+        # anything and nobody notices.
+        legacy = db.query(Account).filter(
+            Account.password_sha == sha_password(password)).first()
+        if legacy:
+            legacy.pw_lookup = lookup_index(password)
+            legacy.pw_verify = make_verifier(password)
+            legacy.password_sha = opaque_legacy_index()
+            db.commit()
+            account = legacy
+    if not account:
+        _record_failure(request)
         ctx = {"error_login": "Incorrect password.", "error_create": ""}
         return templates.TemplateResponse(request, "login.html", ctx, status_code=401)
     resp = RedirectResponse("/admin" if account.is_admin else "/dashboard", status_code=302)
@@ -179,7 +254,6 @@ async def admin_panel(
             "created_at": a.created_at.strftime("%b %d, %Y"),
             "item_count": count,
             "last_activity": last.updated_at.strftime("%b %d, %Y") if last else "—",
-            "password_plain": a.password_plain or "—",
         })
     return templates.TemplateResponse(request, "admin.html", {
         "rows": rows,
@@ -200,12 +274,16 @@ async def admin_reset_password(
     account = db.query(Account).filter(Account.id == account_id, Account.is_admin == False).first()
     if not account:
         return RedirectResponse("/admin", status_code=302)
-    sha = sha_password(new_password)
-    collision = db.query(Account).filter(Account.password_sha == sha, Account.id != account_id).first()
+    collision = db.query(Account).filter(
+        (Account.pw_lookup == lookup_index(new_password)) |
+        (Account.password_sha == sha_password(new_password)),
+        Account.id != account_id,
+    ).first()
     if collision:
         return RedirectResponse("/admin?error=Password+already+in+use+by+another+account", status_code=302)
-    account.password_sha = sha
-    account.password_plain = new_password
+    account.pw_lookup = lookup_index(new_password)
+    account.pw_verify = make_verifier(new_password)
+    account.password_sha = opaque_legacy_index()
     db.commit()
     return RedirectResponse(f"/admin?reset={account_id}", status_code=302)
 

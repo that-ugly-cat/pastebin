@@ -56,11 +56,6 @@
 
     .reset-ok { font-size: 0.75rem; color: #68d391; margin-left: 0.4rem; }
 
-    .pw-cell { display: flex; align-items: center; gap: 0.4rem; }
-    .pw-text { font-family: monospace; font-size: 0.82rem; color: #e2e8f0; filter: blur(4px); transition: filter 0.15s; cursor: pointer; user-select: none; }
-    .pw-text.visible { filter: none; cursor: default; }
-    .pw-toggle { background: none; border: none; color: #4a5568; font-size: 0.72rem; cursor: pointer; padding: 0; line-height: 1; flex-shrink: 0; }
-    .pw-toggle:hover { color: #a0aec0; }
   </style>
 </head>
 <body>
@@ -74,7 +69,7 @@
 
 <div class="container">
   <h1>Admin Panel</h1>
-  <p class="sub">Manage accounts and reset passwords.</p>
+  <p class="sub">Manage accounts and reset passwords. Passwords are not stored in a readable form and cannot be shown here — set a new one instead.</p>
 
   {% if error %}
   <div class="alert alert-error">{{ error }}</div>
@@ -91,7 +86,6 @@
         <th>Created</th>
         <th>Last activity</th>
         <th style="text-align:center">Items</th>
-        <th>Password</th>
         <th>Reset password</th>
         <th></th>
       </tr>
@@ -103,12 +97,6 @@
         <td>{{ row.created_at }}</td>
         <td>{{ row.last_activity }}</td>
         <td class="count-col">{{ row.item_count }}</td>
-        <td>
-          <div class="pw-cell">
-            <span class="pw-text" id="pw-{{ row.id }}" onclick="togglePw({{ row.id }})">{{ row.password_plain }}</span>
-            <button class="pw-toggle" onclick="togglePw({{ row.id }})" title="Show/hide">👁</button>
-          </div>
-        </td>
         <td>
           <form class="reset-form" method="post" action="/admin/accounts/{{ row.id }}/reset">
             <input type="password" name="new_password" placeholder="New password" minlength="6" required>
@@ -128,11 +116,5 @@
   {% endif %}
 </div>
 
-<script>
-function togglePw(id) {
-  const el = document.getElementById("pw-" + id);
-  el.classList.toggle("visible");
-}
-</script>
 </body>
 </html>
