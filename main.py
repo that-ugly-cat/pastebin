@@ -76,6 +76,24 @@ def _record_failure(request: Request) -> None:
 
 # ── Landing ───────────────────────────────────────────────────────────────────
 
+@app.get("/guide", response_class=HTMLResponse)
+async def guide(request: Request):
+    """The user guide, rendered from docs/guide.md, and public like the landing.
+
+    It is linked from the card on borant.eu/tools, where the reader has no
+    account yet — and here that means no password yet, which is the one decision
+    this tool asks you to get right before you use it. One source of truth: the
+    markdown in the repository, so the page cannot drift from what ships.
+    """
+    import markdown
+    md_text = (Path(__file__).parent / "docs" / "guide.md").read_text(encoding="utf-8")
+    return templates.TemplateResponse(request, "guide.html", {
+        "guide_html": markdown.markdown(md_text, extensions=["tables", "fenced_code"]),
+        "app_name": "Pastebin",
+        "app_url": "/",
+    })
+
+
 @app.get("/", response_class=HTMLResponse)
 async def landing(request: Request):
     if request.cookies.get("access_token"):
