@@ -3,7 +3,8 @@ services:
     build: .
     restart: unless-stopped
     ports:
-      - "8511:8000"
+      # Bound to loopback, not 0.0.0.0: the gate's design rests on the bind.
+      - "127.0.0.1:8511:8000"
     volumes:
       - ./data:/app/data
     environment:
