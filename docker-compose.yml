@@ -1,5 +1,6 @@
 services:
   web:
+    container_name: pastebin
     build: .
     restart: unless-stopped
     ports:
